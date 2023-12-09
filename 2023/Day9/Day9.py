@@ -1,7 +1,7 @@
 '''
 
 Solutions for Part 1 and 2 for Day9 Advent of Code 2023
-Oskar Soth
+Oskar Soth @ University of Potsdam
 
 '''
 
