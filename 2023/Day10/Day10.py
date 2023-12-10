@@ -1,74 +1,90 @@
-def is_valid_move(matrix, visited, row, col):
-	return 0 <= row < len(matrix) and 0 <= col < len(matrix[0]) and not visited[row][col]
+import sys
+from shapely.geometry import Polygon, Point
+from time import time
+
+'''
+Ugliest Solution ever by Oskar Soth @ University of Potsdam
+Not Proud!!!
+'''
+sys.setrecursionlimit(50000)
+directions = {
+	"|": ("north", "south"),
+	"-": ("east", "west"),
+	"L": ("north", "east"),
+	"7": ("south", "west"),
+	"J": ("north", "west"),
+	"F": ("south", "east"),
+	"S": ("north", "south", "east", "west"),
+	".": None
+}
 
 
-def dfs_with_distance(matrix, visited, row, col, start_row, start_col, prev_direction, dict, distance=0):
-	opposite_direction = {"north": "south", "south": "north", "east": "west", "west": "east", None: None}
-	# Check if we reached the start position again
-	if row == start_row and col == start_col and distance > 0:
-		return distance
-
-	# Mark the current cell as visited
-	visited[row][col] = True
-	max_distance = distance
-
-	# Get possible directions for the current symbol
-	possible_directions = dict[matrix[row][col]]
-
-	if possible_directions is not None:
-		for new_direction in possible_directions:
-			new_row, new_col = None, None
-			# Calculate the new position based on the direction
-			if new_direction == "north" and new_direction != opposite_direction[prev_direction]:
-				new_row, new_col = row - 1, col
-			elif new_direction == "south" and new_direction != opposite_direction[prev_direction]:
-				new_row, new_col = row + 1, col
-			elif new_direction == "east" and new_direction != opposite_direction[prev_direction]:
-				new_row, new_col = row, col + 1
-			elif new_direction == "west" and new_direction != opposite_direction[prev_direction]:
-				new_row, new_col = row, col - 1
-			if new_row is None or new_col is None:
-				continue
-			# Check if the move is valid and not going back
-			if is_valid_move(matrix, visited, new_row, new_col) and new_direction != prev_direction:
-				# Recursively call DFS for the next cell
-				sub_distance = dfs_with_distance(matrix, visited, new_row, new_col, start_row, start_col, new_direction, dict, distance + 1)
-				if sub_distance is None:
-					sub_distance = max_distance
-				# Update the maximum distance for the current cell
-				max_distance = max(max_distance, sub_distance)
-
-	# Backtrack: mark the current cell as not visited
-		visited[row][col] = False
-		return max_distance
+def is_valid_move(x, y, visited):
+	return 0 <= x < len(maze) and 0 <= y < len(maze[0]) and (x, y) not in visited
 
 
-def find_highest_distance_in_loop(matrix, start_symbol, dict):
-	max_distance = 0
-	for row in range(len(matrix)):
-		for col in range(len(matrix[0])):
-			if matrix[row][col] == start_symbol:
-				visited = [[False for _ in range(len(matrix[0]))] for _ in range(len(matrix))]
-				distance = dfs_with_distance(matrix, visited, row, col, row, col, None, dict)
-				max_distance = max(max_distance, distance)
-	return max_distance
+def dfs(x, y, visited, current_path, start_position):
+	visited.add((x, y))
+	loops = []
+	current_path.append((x, y))
+	loops.append(current_path)
+	if maze[x][y] == ".":
+		return []
+
+	if (x, y) == start_position and len(current_path) > 1:
+		# Found a loop, terminate the path
+		return [current_path]
+	elif (x, y) in current_path[:-1]:
+		# Found a revisited position, terminate the path
+		return [current_path[current_path.index((x, y)):]]
+
+	for direction in directions.get(maze[x][y], []):
+		dx, dy = 0, 0
+		if direction == "north":
+			dx = -1
+		elif direction == "south":
+			dx = 1
+		elif direction == "east":
+			dy = 1
+		elif direction == "west":
+			dy = -1
+
+		new_x, new_y = x + dx, y + dy
+
+		if is_valid_move(new_x, new_y, visited):
+			loops.extend(dfs(new_x, new_y, visited.copy(), current_path.copy(), start_position))
+	return loops
+
+
+def find_biggest_loop(start_x, start_y):
+	visited = set()
+	current_path = []
+	loops = dfs(start_x, start_y, visited, current_path, (start_x, start_y))
+	if loops:
+		biggest_loop = max(loops, key=len)
+		return biggest_loop
+	else:
+		return None
 
 
 if __name__ == "__main__":
-	dict = {
-		"|": ("north", "south"),
-		"-": ("east", "west"),
-		"L": ("north", "east"),
-		"7": ("south", "west"),
-		"J": ("north", "east"),
-		"F": ("south", "east"),
-		"S": ("north", "south", "east", "west"),
-		".": None
-	}
-	lines = []
-	with open("Day10test.txt", "r") as f:
-		for line in f:
-			lines.append(line.rstrip("\n"))
+	start_time = time()
+	with open("Day10.txt", "r") as f:
+		maze = [list(line.strip()) for line in f.readlines()]
+	start_position = [(i, row.index("S")) for i, row in enumerate(maze) if "S" in row][0]
 
-	result = find_highest_distance_in_loop(lines, "S", dict)
-	print(result)
+	# Find the biggest loop starting from the "S" position
+	result = find_biggest_loop(*start_position)
+	if len(result) % 2 == 0:
+		print("Aufgabe 1: "+ str(len(result)//2))
+	else:
+		print("Aufgabe 1: "+ str(len(result)//2 + 1))
+	poly = Polygon(result)
+	sum = 0
+	for i in range(140):
+		for j in range(140):
+			if poly.contains(Point(i, j)):
+				sum += 1
+	print("Aufgabe 2: " + str(sum))
+	end_time = time()
+	print("Runtime: " + str(end_time - start_time))
